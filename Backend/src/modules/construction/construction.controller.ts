@@ -1,0 +1,19 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ConstructionService } from './construction.service';
+import { CreateMRNDto, CreateRABillDto, CreateWorkOrderDto, UpdateWorkOrderDto } from './dtos/construction-workflow.dto';
+import { ConstructionPaymentDto } from './dtos/construction-payment.dto';
+import { CreateSiteLaborDto, DisburseSiteLaborDto } from './dtos/site-labor.dto';
+import { Roles } from '../../common/auth/roles.decorator';
+import { RolesGuard } from '../../common/auth/roles.guard';
+import { UserRole } from '../users/entities/user.entity';
+@ApiTags('construction') @Controller('construction') @UseGuards(JwtAuthGuard, RolesGuard) @Roles(UserRole.ADMIN, UserRole.VIEWER) @ApiBearerAuth()
+export class ConstructionController { constructor(private service: ConstructionService) {} @Get('contractors') contractors() { return this.service.findContractors(); } @Post('contractors') createContractor(@Body() dto: any) { return this.service.createContractor(dto); } @Patch('contractors/:id') updateContractor(@Param('id') id: string, @Body() dto: any) { return this.service.updateContractor(id, dto); } @Delete('contractors/:id') deleteContractor(@Param('id') id: string) { return this.service.deleteContractor(id); } @Get('equipment') equipment() { return this.service.findEquipment(); } @Post('equipment') createEquipment(@Body() dto: any) { return this.service.createEquipment(dto); } @Patch('equipment/:id') updateEquipment(@Param('id') id: string, @Body() dto: any) { return this.service.updateEquipment(id, dto); } @Delete('equipment/:id') deleteEquipment(@Param('id') id: string) { return this.service.deleteEquipment(id); } @Get('fuel-logs') fuelLogs() { return this.service.findFuelLogs(); } @Post('fuel-logs') createFuelLog(@Body() dto: any) { return this.service.createFuelLog(dto); } @Get('labor') labor() { return this.service.findLabor(); } @Post('labor') createLabor(@Body() dto: CreateSiteLaborDto) { return this.service.createLabor(dto); } @Post('labor/:id/approve') approveLabor(@Param('id') id: string) { return this.service.approveLabor(id); } @Post('labor/:id/disburse') disburseLabor(@Param('id') id: string, @Body() dto: DisburseSiteLaborDto) { return this.service.disburseLabor(id, dto); } @Get('mrns') mrns() { return this.service.findMRNs(); } @Post('mrns') createMRN(@Body() dto: CreateMRNDto) { return this.service.createMRN(dto); } @Post('mrns/:id/approve') approveMRN(@Param('id') id: string) { return this.service.approveMRN(id); } @Get('work-orders') workOrders() { return this.service.findWorkOrders(); } @Post('work-orders') createWorkOrder(@Body() dto: CreateWorkOrderDto) { return this.service.createWorkOrder(dto); } @Patch('work-orders/:id') updateWorkOrder(@Param('id') id: string, @Body() dto: UpdateWorkOrderDto) { return this.service.updateWorkOrder(id, dto); } @Delete('work-orders/:id') deleteWorkOrder(@Param('id') id: string) { return this.service.deleteWorkOrder(id); } @Post('work-orders/:id/approve') approveWorkOrder(@Param('id') id: string) { return this.service.approveWorkOrder(id); } @Get('ra-bills') raBills() { return this.service.findRABills(); } @Post('ra-bills') createRABill(@Body() dto: CreateRABillDto) { return this.service.createRABill(dto); } @Post('ra-bills/:id/approve') approveRABill(@Param('id') id: string) { return this.service.approveRABill(id); } @Post('ra-bills/:id/post') postRABill(@Param('id') id: string) { return this.service.postRABill(id); } @Post('ra-bills/pay') payRABill(@Body() dto: ConstructionPaymentDto) { return this.service.payRABill(dto); }
+
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Get construction dashboard aggregates' })
+  dashboard() {
+    return this.service.getDashboard();
+  } 
+}

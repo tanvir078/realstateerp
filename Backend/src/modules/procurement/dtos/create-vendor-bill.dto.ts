@@ -1,0 +1,2 @@
+import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+export class CreateVendorBillDto { @IsString() @IsNotEmpty() vendorId: string; @IsString() @IsNotEmpty() billNo: string; @IsOptional() @IsString() projectId?: string; @IsOptional() @IsString() purchaseOrderId?: string; @IsOptional() @IsString() goodsReceiptId?: string; @IsNumber() @Min(0.01) amount: number; @IsDateString() issueDate: string; @IsDateString() dueDate: string; @IsOptional() @IsString() particulars?: string; }

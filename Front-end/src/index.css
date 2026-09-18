@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: #E2E8F0;
+  background: #213c38b6;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-synthesis: none;
+  letter-spacing: 0;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root[data-theme="light"] body {
+  color: #d2e8e5;
+  background: #F4F7F6;
+}
+
+:root[data-theme="light"] .bg-background-primary,
+:root[data-theme="light"] .bg-\[\#0B1915\],
+:root[data-theme="light"] .bg-\[\#0B1816\] {
+  background-color: #F4F7F6;
+}
+
+:root[data-theme="light"] .bg-background-secondary,
+:root[data-theme="light"] .bg-\[\#112421\],
+:root[data-theme="light"] .bg-\[\#132B24\],
+:root[data-theme="light"] .bg-card-surface {
+  background-color: #FFFFFF !important;
+}
+
+:root[data-theme="light"] .bg-background-tertiary,
+:root[data-theme="light"] .bg-\[\#16342B\] {
+  background-color: #E8F1EE;
+}
+
+:root[data-theme="light"] .border-card-border,
+:root[data-theme="light"] .border-\[\#1E3E37\],
+:root[data-theme="light"] .border-\[\#1E4338\] {
+  border-color: #D2E0DB !important;
+}
+
+:root[data-theme="light"] .text-text-primary,
+:root[data-theme="light"] .text-white,
+:root[data-theme="light"] .text-\[\#E2E8F0\] {
+  color: #17231F !important;
+}
+
+:root[data-theme="light"] .text-text-secondary,
+:root[data-theme="light"] .text-\[\#829B96\],
+:root[data-theme="light"] .text-\[\#9CA3AF\] {
+  color: #60756D !important;
+}
+
+:root[data-theme="light"] .text-text-muted {
+  color: #176B50;
+}
+
+:root[data-theme="light"] .text-slate-950 {
+  color: #FFFFFF !important;
+}
+
+:root[data-theme="light"] .bg-gradient-to-br {
+  background-image: linear-gradient(135deg, #E7F7F0 0%, #F4F7F6 100%) !important;
+}
+
+:root[data-theme="light"] .text-\[\#B8D8CE\] {
+  color: #3F6659 !important;
+}
+
+:root[data-theme="light"] .text-amber-400,
+:root[data-theme="light"] .text-amber-500,
+:root[data-theme="light"] .text-sky-400,
+:root[data-theme="light"] .text-emerald-400,
+:root[data-theme="light"] .text-rose-400 {
+  filter: saturate(0.9) brightness(0.78);
+}
+
+:root[data-theme="light"] .bg-input-bg,
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea {
+  background-color: #FFFFFF !important;
+  color: #17231F !important;
+}
+
+:root[data-theme="light"] .placeholder\:text-text-muted::placeholder {
+  color: #82958E;
+}
+
+:root[data-theme="light"] .placeholder-\[\#829B96\]::placeholder {
+  color: #82958E !important;
+}
+
+:root[data-theme="light"] .bg-\[\#0B1816\]\/40,
+:root[data-theme="light"] .bg-\[\#0B1816\]\/80,
+:root[data-theme="light"] .bg-\[\#1A3530\]\/40 {
+  background-color: #EEF5F2 !important;
+}
+
+:root[data-theme="light"] .bg-\[\#10B981\]\/10 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+:root[data-theme="light"] .border-t-2 {
+  border-top-color: #D2E0DB !important;
+}
+
+:root[data-theme="light"] .hover\:bg-background-secondary:hover,
+:root[data-theme="light"] .hover\:bg-\[\#1A3530\]\/40:hover {
+  background-color: #E8F1EE;
+}
+
+:root[data-theme="light"] .page-shell > div > div:first-child {
+  border-bottom-color: #D2E0DB;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.page-shell {
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+}
+
+.page-shell .tracking-tight,
+.page-shell .tracking-wide,
+.page-shell .tracking-wider {
+  letter-spacing: 0;
+}
+
+.page-shell > div {
+  min-width: 0;
+}
+
+.page-shell > div > div:first-child {
+  border-bottom-color: rgba(30, 62, 55, 0.9);
+}
+
+.sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.page-shell {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page-shell::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Match the compact Dashboard KPI treatment on legacy summary-card grids. */
+.page-shell .bg-\[\#112421\].border.border-\[\#1E3E37\].p-4.rounded-xl.space-y-1 {
+  border-radius: 0.5rem;
+  border-left-width: 2px;
+  padding: 1rem;
+  row-gap: 0.5rem;
+}
+
+/* Keep routed page headers focused on the title and actions. */
+.page-shell > div > div:first-child > div:first-child:has(> span) {
+  display: none;
+}
+
+.page-shell h1 + p {
+  display: none;
+}
+
+.page-shell .text-\[11px\],
+.page-shell .text-xs,
+.page-shell .text-sm {
+  letter-spacing: 0;
+}
+
+.page-shell .rounded-xl,
+.page-shell .rounded-lg,
+.page-shell .rounded-md {
+  border-radius: 0.75rem;
+}
+
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
+  }
+
+  .page-shell {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 767px) {
+  .page-shell {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .page-shell > div {
+    width: 100%;
+  }
+}

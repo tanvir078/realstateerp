@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SLBL ERP</string>
+    <string name="title_activity_main">SLBL ERP</string>
+    <string name="package_name">com.slbl.erp</string>
+    <string name="custom_url_scheme">com.slbl.erp</string>
+</resources>

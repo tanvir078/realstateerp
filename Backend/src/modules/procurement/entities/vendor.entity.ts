@@ -1,0 +1,3 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+@Entity('vendors')
+export class Vendor { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) vendorCode: string; @Column() name: string; @Column() type: string; @Column() contact: string; @Column({ nullable: true }) email: string; @Column({ nullable: true }) address: string; @Column({ default: 'ACTIVE' }) status: string; @Column({ default: '30 days' }) paymentTerms: string; @CreateDateColumn() createdAt: Date; @UpdateDateColumn() updatedAt: Date; }

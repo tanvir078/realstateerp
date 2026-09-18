@@ -1,0 +1,416 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { 
+  Search, Filter, Download, ChevronRight, Plus, 
+  Building2, Layers, Home, Eye, Edit, Grid, Table, CheckCircle2
+} from "lucide-react";
+import ExportModal from "@/components/forms/ExportModal";
+import AddUnitModal from "@/components/forms/AddUnitModal";
+import BulkCreateUnitsModal from "@/components/forms/BulkCreateUnitsModal";
+
+interface Unit {
+  id: string;
+  unitCode: string;
+  projectName: string;
+  floorLevel: string;
+  unitType: "APARTMENT" | "COMMERCIAL_SHOP" | "PARKING" | "OFFICE_SPACE";
+  size: number;
+  facing: string;
+  bedrooms: number;
+  bathrooms: number;
+  basePricePerSft: number;
+  parkingPrice: number;
+  utilityCharges: number;
+  totalPrice: number;
+  ownership: "DEVELOPER_SHARE" | "LANDOWNER_SHARE";
+  status: "AVAILABLE" | "BOOKED" | "SOLD" | "BLOCKED";
+}
+
+export default function UnitsPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedType, setSelectedType] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [viewMode, setViewMode] = useState<"TABLE" | "MATRIX">("TABLE");
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
+  const [isBulkCreateModalOpen, setIsBulkCreateModalOpen] = useState(false);
+
+  // Mock Units Data
+  const [units] = useState<Unit[]>([
+    {
+      id: "1",
+      unitCode: "Apt #4-A",
+      projectName: "Sobhagya Green Valley",
+      floorLevel: "4th Floor",
+      unitType: "APARTMENT",
+      size: 1450,
+      facing: "South",
+      bedrooms: 3,
+      bathrooms: 3,
+      basePricePerSft: 6500,
+      parkingPrice: 400000,
+      utilityCharges: 200000,
+      totalPrice: 9925000,
+      ownership: "DEVELOPER_SHARE",
+      status: "AVAILABLE"
+    },
+    {
+      id: "2",
+      unitCode: "Apt #4-B",
+      projectName: "Sobhagya Green Valley",
+      floorLevel: "4th Floor",
+      unitType: "APARTMENT",
+      size: 1650,
+      facing: "North",
+      bedrooms: 3,
+      bathrooms: 3,
+      basePricePerSft: 6200,
+      parkingPrice: 400000,
+      utilityCharges: 200000,
+      totalPrice: 10830000,
+      ownership: "DEVELOPER_SHARE",
+      status: "BOOKED"
+    },
+    {
+      id: "3",
+      unitCode: "Apt #7-A",
+      projectName: "Sobhagya Grand Heights",
+      floorLevel: "7th Floor",
+      unitType: "APARTMENT",
+      size: 1850,
+      facing: "East",
+      bedrooms: 4,
+      bathrooms: 4,
+      basePricePerSft: 7000,
+      parkingPrice: 500000,
+      utilityCharges: 250000,
+      totalPrice: 15450000,
+      ownership: "LANDOWNER_SHARE",
+      status: "SOLD"
+    },
+    {
+      id: "4",
+      unitCode: "Shop #G-12",
+      projectName: "City Vista Plaza",
+      floorLevel: "Ground Floor",
+      unitType: "COMMERCIAL_SHOP",
+      size: 450,
+      facing: "Road Facing",
+      bedrooms: 0,
+      bathrooms: 1,
+      basePricePerSft: 12000,
+      parkingPrice: 0,
+      utilityCharges: 100000,
+      totalPrice: 5500000,
+      ownership: "DEVELOPER_SHARE",
+      status: "AVAILABLE"
+    },
+    {
+      id: "5",
+      unitCode: "Apt #9-C",
+      projectName: "Sobhagya Grand Heights",
+      floorLevel: "9th Floor",
+      unitType: "APARTMENT",
+      size: 1550,
+      facing: "South-East",
+      bedrooms: 3,
+      bathrooms: 3,
+      basePricePerSft: 6800,
+      parkingPrice: 400000,
+      utilityCharges: 200000,
+      totalPrice: 10940000,
+      ownership: "DEVELOPER_SHARE",
+      status: "BLOCKED"
+    },
+  ]);
+
+  const handleExport = (config: any) => {
+    console.log("Export config:", config);
+    // TODO: Implement export logic
+  };
+
+  const handleAddUnit = (data: any) => {
+    console.log("Add unit data:", data);
+    // TODO: Implement save logic
+  };
+
+  const handleBulkCreate = (data: any) => {
+    console.log("Bulk create data:", data);
+    // TODO: Implement bulk save logic
+  };
+
+  const formatCurrency = (amount: number) => "৳ " + amount.toLocaleString("en-BD");
+
+  // Filtering Logic
+  const filteredUnits = units.filter((item) => {
+    const matchesSearch = 
+      item.unitCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.floorLevel.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesType = selectedType === "ALL" || item.unitType === selectedType;
+    const matchesStatus = selectedStatus === "ALL" || item.status === selectedStatus;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // KPI Calculations
+  const totalUnits = units.length;
+  const availableUnits = units.filter(u => u.status === "AVAILABLE").length;
+  const bookedUnits = units.filter(u => u.status === "BOOKED").length;
+  const soldUnits = units.filter(u => u.status === "SOLD").length;
+  const blockedUnits = units.filter(u => u.status === "BLOCKED").length;
+
+  return (
+    <div className="w-full space-y-6 text-[#E2E8F0]">
+      
+      {/* 1. Breadcrumb & Page Header */}
+      <div className="space-y-3 pb-2 border-b border-[#1E3E37]">
+        <div className="flex items-center gap-2 text-xs text-[#829B96]">
+          <span>Dashboard</span>
+          <ChevronRight className="h-3 w-3" />
+          <span>Projects & Property</span>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-white font-medium">Unit Management</span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Unit Management</h1>
+            <p className="text-xs text-[#829B96] mt-0.5">
+              Manage property units and allocations
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#112421] border-[#1E3E37] text-white hover:bg-[#1A3530] text-xs gap-1.5"
+              onClick={() => setIsExportModalOpen(true)}
+            >
+              <Download className="h-3.5 w-3.5 text-[#10B981]" />
+              Export
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              bg-[#112421] border border-[#1E3E37] text-white hover:bg-[#1A3530] text-xs gap-1.5"
+              onClick={() => setIsBulkCreateModalOpen(true)}
+            className="bg-[#112421] border-[#1E3E37] text-white hover:bg-[#1A3530] text-xs gap-1.5"
+            >
+              <Layers className="h-3.5 w-3.5 text-[#10B981]" />
+              Bulk Import
+            </Button>
+            <Button size="sm" className="bg-[#10B981] hover:bg-[#0D9668] text-slate-950 font-semibold text-xs gap-1.5"
+              onClick={() => setIsAddUnitModalOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Unit
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Inventory KPI Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl space-y-1">
+          <p className="text-[10px] text-[#829B96] font-medium uppercase tracking-wider">Total Units</p>
+          <p className="text-lg font-bold text-white">{totalUnits}</p>
+        </div>
+        <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl space-y-1">
+          <p className="text-[10px] text-[#829B96] font-medium uppercase tracking-wider">Available</p>
+          <p className="text-lg font-bold text-[#10B981]">{availableUnits}</p>
+        </div>
+        <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl space-y-1">
+          <p className="text-[10px] text-[#829B96] font-medium uppercase tracking-wider">Booked</p>
+          <p className="text-lg font-bold text-amber-400">{bookedUnits}</p>
+        </div>
+        <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl space-y-1">
+          <p className="text-[10px] text-[#829B96] font-medium uppercase tracking-wider">Sold</p>
+          <p className="text-lg font-bold text-rose-400">{soldUnits}</p>
+        </div>
+        <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl space-y-1">
+          <p className="text-[10px] text-[#829B96] font-medium uppercase tracking-wider">Blocked</p>
+          <p className="text-lg font-bold text-purple-400">{blockedUnits}</p>
+        </div>
+      </div>
+
+      {/* 3. Search & Filter Bar */}
+      <div className="bg-[#112421] border border-[#1E3E37] p-3 rounded-xl flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#829B96]" />
+          <input
+            type="text"
+            placeholder="Search unit code, project, floor..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#0B1816] border border-[#1E3E37] rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-[#829B96] focus:outline-none focus:border-[#10B981]"
+          />
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto text-xs">
+          <span className="text-[#829B96] flex items-center gap-1 mr-1">
+            <Filter className="h-3 w-3" /> Type:
+          </span>
+          {["ALL", "APARTMENT", "COMMERCIAL_SHOP", "PARKING", "OFFICE_SPACE"].map((type) => (
+            <button
+              key={type}
+              onClick={() => setSelectedType(type)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                selectedType === type
+                  ? "bg-[#10B981] text-slate-950 font-semibold"
+                  : "bg-[#0B1816] border border-[#1E3E37] text-[#829B96] hover:text-white"
+              }`}
+            >
+              {type === "ALL" ? "All" : type.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto text-xs">
+          <span className="text-[#829B96] flex items-center gap-1 mr-1">
+            Status:
+          </span>
+          {["ALL", "AVAILABLE", "BOOKED", "SOLD", "BLOCKED"].map((status) => (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                selectedStatus === status
+                  ? "bg-[#10B981] text-slate-950 font-semibold"
+                  : "bg-[#0B1816] border border-[#1E3E37] text-[#829B96] hover:text-white"
+              }`}
+            >
+              {status === "ALL" ? "All" : status}
+            </button>
+          ))}
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 bg-[#0B1816] border border-[#1E3E37] rounded-lg p-1">
+          <button
+            onClick={() => setViewMode("TABLE")}
+            className={`p-1.5 rounded ${viewMode === "TABLE" ? "bg-[#10B981] text-slate-950" : "text-[#829B96] hover:text-white"}`}
+          >
+            <Table className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("MATRIX")}
+            className={`p-1.5 rounded ${viewMode === "MATRIX" ? "bg-[#10B981] text-slate-950" : "text-[#829B96] hover:text-white"}`}
+          >
+            <Grid className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Units Table View */}
+      {viewMode === "TABLE" && (
+        <div className="bg-[#112421] border border-[#1E3E37] rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#E2E8F0]">
+              <thead className="bg-[#0B1816]/80 uppercase text-[#829B96] border-b border-[#1E3E37]">
+                <tr>
+                  <th className="p-3.5">Unit Code</th>
+                  <th className="p-3.5">Project</th>
+                  <th className="p-3.5">Floor</th>
+                  <th className="p-3.5">Type</th>
+                  <th className="p-3.5">Size (Sft)</th>
+                  <th className="p-3.5">Facing</th>
+                  <th className="p-3.5">Beds/Baths</th>
+                  <th className="p-3.5">Total Price</th>
+                  <th className="p-3.5">Ownership</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1E3E37]">
+                {filteredUnits.length > 0 ? (
+                  filteredUnits.map((unit) => (
+                    <tr key={unit.id} className="hover:bg-[#1A3530]/40 transition-colors">
+                      <td className="p-3.5 font-mono text-[#10B981] font-medium">{unit.unitCode}</td>
+                      <td className="p-3.5 text-white">{unit.projectName}</td>
+                      <td className="p-3.5 text-[#829B96]">{unit.floorLevel}</td>
+                      <td className="p-3.5 text-[#829B96]">{unit.unitType.replace("_", " ")}</td>
+                      <td className="p-3.5 text-white">{unit.size.toLocaleString()}</td>
+                      <td className="p-3.5 text-[#829B96]">{unit.facing}</td>
+                      <td className="p-3.5 text-white">{unit.bedrooms}B/{unit.bathrooms}B</td>
+                      <td className="p-3.5 font-semibold text-white">{formatCurrency(unit.totalPrice)}</td>
+                      <td className="p-3.5 text-[#829B96]">{unit.ownership.replace("_", " ")}</td>
+                      <td className="p-3.5">
+                        <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded border ${
+                          unit.status === "AVAILABLE" 
+                            ? "text-[#10B981] bg-[#10B981]/10 border-[#10B981]/20"
+                            : unit.status === "BOOKED"
+                            ? "text-amber-400 bg-amber-400/10 border-amber-400/20"
+                            : unit.status === "SOLD"
+                            ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+                            : "text-purple-400 bg-purple-400/10 border-purple-400/20"
+                        }`}>
+                          {unit.status}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button className="p-1.5 rounded-lg bg-[#0B1816] border border-[#1E3E37] text-[#829B96] hover:text-[#10B981] hover:border-[#10B981] transition-all">
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                          <button className="p-1.5 rounded-lg bg-[#0B1816] border border-[#1E3E37] text-[#829B96] hover:text-white hover:border-[#10B981] transition-all">
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={11} className="p-8 text-center text-[#829B96] text-xs">
+                      No units found matching your search filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Matrix View Placeholder */}
+      {viewMode === "MATRIX" && (
+        <div className="bg-[#112421] border border-[#1E3E37] rounded-xl p-8 text-center">
+          <Grid className="h-12 w-12 mx-auto mb-4 text-[#829B96] opacity-50" />
+          <h3 className="text-lg font-semibold text-white mb-1">Stacking Matrix View</h3>
+          <p className="text-sm text-[#829B96]">
+            Visual floor-by-floor unit grid will be displayed here.
+          </p>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExport}
+        availableColumns={["Unit Code", "Project", "Floor", "Type", "Size", "Facing", "Bedrooms", "Bathrooms", "Base Price/Sft", "Parking Price", "Utility Charges", "Total Price", "Ownership", "Status"]}
+        defaultColumns={["Unit Code", "Project", "Floor", "Type", "Size", "Total Price", "Ownership", "Status"]}
+        title="Export Units List"
+      />
+
+      {/* Add Unit Modal */}
+      <AddUnitModal
+        isOpen={isAddUnitModalOpen}
+        onClose={() => setIsAddUnitModalOpen(false)}
+        onSave={handleAddUnit}
+        projects={[
+          { id: "1", name: "Sobhagya Green Valley" },
+          { id: "2", name: "Sobhagya Grand Heights" },
+          { id: "3", name: "City Vista Plaza" }
+        ]}
+      />
+
+    </div>
+  );
+}

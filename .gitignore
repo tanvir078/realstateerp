@@ -1,0 +1,33 @@
+# Desktop app - entire folder
+Desktop/
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Azure files
+.azure/
+.copilot-azure/
+.foundry/
+.kilo/
+
+# Temporary files
+*.tmp
+*.temp

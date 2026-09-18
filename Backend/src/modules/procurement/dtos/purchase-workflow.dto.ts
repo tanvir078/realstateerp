@@ -1,0 +1,4 @@
+import { IsDateString, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+export class CreateRequisitionDto { @IsString() @IsNotEmpty() projectId: string; @IsString() @IsNotEmpty() requestedBy: string; @IsString() @IsNotEmpty() items: string; @IsNumber() @Min(0) estimatedAmount: number; }
+export class CreatePurchaseOrderDto { @IsString() @IsNotEmpty() requisitionId: string; @IsString() @IsNotEmpty() vendorId: string; @IsString() @IsNotEmpty() projectId: string; @IsString() @IsNotEmpty() items: string; @IsNumber() @Min(0) totalAmount: number; @IsDateString() deliveryDate: string; }
+export class CreateGoodsReceiptDto { @IsString() @IsNotEmpty() purchaseOrderId: string; @IsNumber() @Min(0) receivedAmount: number; @IsDateString() receivedDate: string; }

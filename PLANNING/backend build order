@@ -1,0 +1,1331 @@
+বুঝেছি। Frontend-এর বিদ্যমান feature structure ধরে Backend বানানোর জন্য আগে module ownership, lifecycle, automation, API contract, route/path এবং function boundary একসাথে মিলিয়ে একটি বাস্তব build workflow দাঁড় করাব। প্রথমে planning docs এবং বর্তমান Backend module structure থেকে controlling pattern যাচাই করছি, যাতে পরিকল্পনাটি generic না হয়ে এই ERP-এর সঙ্গে মেলে।
+
+Searched codebase for "Frontend pages features navigation modules API services and Backend module structure for the ERP application", no results
+
+Read , lines 1 to 220
+
+Read 
+
+Read , lines 1 to 220
+
+Read , lines 1 to 180
+
+Read 
+
+প্রথম যাচাইয়ে দেখা যাচ্ছে, Backend ইতিমধ্যে NestJS + PostgreSQL + TypeORM ভিত্তিক এবং প্রধান business modules নিবন্ধিত আছে; planning docs-এ frontend endpoint-এর কিছু খসড়া আছে, কিন্তু domain state transition, transaction boundary, authorization এবং automation-এর একক contract এখনো নির্দিষ্ট নয়। এখন existing auth/module implementation দেখে একটি standard module lifecycle স্থির করছি, তারপর সেটির ওপর পুরো execution order দেব।
+
+Read 
+
+Read 
+
+Read 
+
+Read 
+
+Read 
+
+Read 
+
+Existing code থেকে standardটি পরিষ্কার: সব API global `/api/v1` prefix-এর নিচে যাবে, JWT guard module boundary-তে থাকবে, DTO validation global, Swagger চালু আছে; তবে `AccountingModule` এখনো খালি এবং `ClientsService`-এ pagination/authorization/transaction workflow নেই। তাই workflow-এ প্রথমে foundation harden, তারপর dependency order-এ master data → transactional modules → accounting posting → reports/automation রাখছি।
+
+হ্যাঁ, এখন কাজটি Frontend থেকে Backend-driven ERP workflow-এ নিতে হবে। এই Backend-এর জন্য মূল নিয়ম হবে:
+
+```text
+Frontend Action
+  → Controller Route
+  → DTO Validation
+  → Auth/RBAC Guard
+  → Service Use Case
+  → Domain Validation
+  → Database Transaction
+  → Audit Log
+  → Domain Event
+  → Automation
+  → API Response
+```
+
+বর্তমান Backend অনুযায়ী Base URL হবে:
+
+```text
+http://localhost:3000/api/v1
+```
+
+Swagger:
+
+```text
+http://localhost:3000/api/docs
+```
+
+## ১. Backend Build Order
+
+Dependency অনুযায়ী কাজের সঠিক ক্রম:
+
+### Phase 1: Foundation
+
+প্রথমে তৈরি ও ঠিক করতে হবে:
+
+```text
+Backend/src/common/
+├── decorators/
+├── dtos/
+├── filters/
+├── guards/
+├── interceptors/
+├── pipes/
+└── events/
+```
+
+প্রয়োজনীয় foundation:
+
+- Global response format
+- Global exception format
+- Pagination DTO
+- Search/filter DTO
+- JWT authentication
+- Role-based permission
+- Audit log
+- Request ID
+- Database transaction helper
+- File upload abstraction
+- Notification abstraction
+- Background job/scheduler
+- Swagger standards
+- Environment validation
+- Soft delete convention
+
+Standard response:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Operation completed successfully",
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 100
+  }
+}
+```
+
+Standard error:
+
+```json
+{
+  "success": false,
+  "message": "Client not found",
+  "errorCode": "CLIENT_NOT_FOUND",
+  "details": null,
+  "timestamp": "2026-09-09T00:00:00.000Z",
+  "path": "/api/v1/clients/123"
+}
+```
+
+---
+
+## ২. প্রত্যেক Module-এর Standard Structure
+
+প্রত্যেক module একই lifecycle অনুসরণ করবে।
+
+উদাহরণ: Clients module
+
+```text
+Backend/src/modules/clients/
+├── clients.module.ts
+├── clients.controller.ts
+├── clients.service.ts
+├── clients.repository.ts
+├── clients.policy.ts
+├── clients.mapper.ts
+├── dto/
+│   ├── create-client.dto.ts
+│   ├── update-client.dto.ts
+│   ├── client-query.dto.ts
+│   └── client-response.dto.ts
+├── entities/
+│   └── client.entity.ts
+├── events/
+│   ├── client-created.event.ts
+│   └── client-created.handler.ts
+├── jobs/
+│   └── client-reminder.job.ts
+└── clients.service.spec.ts
+```
+
+### Controller-এর কাজ
+
+Controller শুধু করবে:
+
+- Route define
+- DTO গ্রহণ
+- Guard প্রয়োগ
+- Service call
+- HTTP response return
+
+Controller-এ business logic রাখা যাবে না।
+
+```typescript
+@Post()
+create(@Body() dto: CreateClientDto, @CurrentUser() user: User) {
+  return this.clientsService.create(dto, user);
+}
+```
+
+### Service-এর কাজ
+
+Service হবে business workflow-এর কেন্দ্র:
+
+```typescript
+async create(dto: CreateClientDto, user: User) {
+  await this.validateDuplicate(dto);
+  const client = await this.repository.create(dto, user);
+  await this.audit.log('CLIENT_CREATED', client.id, user.id);
+  await this.events.publish(new ClientCreatedEvent(client.id));
+  return this.mapper.toResponse(client);
+}
+```
+
+### Repository-এর কাজ
+
+Repository শুধু database query করবে:
+
+```typescript
+findById(id: string)
+findByPhone(phone: string)
+findPaginated(query: ClientQueryDto)
+save(client: Client)
+```
+
+### Policy-এর কাজ
+
+কার user কোন action করতে পারবে:
+
+```typescript
+canCreate(user)
+canUpdate(user, client)
+canDelete(user, client)
+canApprove(user, document)
+```
+
+---
+
+# ৩. Exact Module Lifecycle
+
+প্রত্যেক business document-এর lifecycle নিচের মতো হবে।
+
+## Draft Lifecycle
+
+```text
+DRAFT
+  ↓
+SUBMITTED
+  ↓
+UNDER_REVIEW
+  ↓
+APPROVED / REJECTED
+  ↓
+PROCESSING
+  ↓
+COMPLETED
+  ↓
+CANCELLED
+```
+
+সব module-এ একই status ব্যবহার করা যাবে না। Domain অনুযায়ী status থাকবে।
+
+উদাহরণ:
+
+### Booking
+
+```text
+DRAFT
+PENDING_APPROVAL
+CONFIRMED
+ACTIVE
+COMPLETED
+CANCELLED
+```
+
+### Voucher
+
+```text
+DRAFT
+SUBMITTED
+APPROVED
+POSTED
+REVERSED
+CANCELLED
+```
+
+### Purchase Order
+
+```text
+DRAFT
+SUBMITTED
+APPROVED
+PARTIALLY_RECEIVED
+FULLY_RECEIVED
+CLOSED
+CANCELLED
+```
+
+### RA Bill
+
+```text
+DRAFT
+SUBMITTED
+SITE_VERIFIED
+PROJECT_APPROVED
+FINANCE_APPROVED
+PAID
+REJECTED
+```
+
+Status change সরাসরি `PATCH status` দিয়ে করা যাবে না। আলাদা action route থাকতে হবে:
+
+```text
+POST /api/v1/bookings/:id/submit
+POST /api/v1/bookings/:id/approve
+POST /api/v1/bookings/:id/reject
+POST /api/v1/bookings/:id/cancel
+```
+
+এর ফলে প্রতিটি status change:
+
+- Permission check করবে
+- Previous status যাচাই করবে
+- Audit log তৈরি করবে
+- কে পরিবর্তন করেছে সংরক্ষণ করবে
+- Automation trigger করবে
+
+---
+
+# ৪. Exact API Route Structure
+
+সব route-এর base:
+
+```text
+/api/v1
+```
+
+## Auth
+
+```text
+POST   /auth/login
+POST   /auth/register
+POST   /auth/refresh
+POST   /auth/logout
+GET    /auth/profile
+```
+
+## Users
+
+```text
+GET    /users
+POST   /users
+GET    /users/:id
+PATCH  /users/:id
+DELETE /users/:id
+
+POST   /users/:id/activate
+POST   /users/:id/deactivate
+PATCH  /users/:id/roles
+```
+
+## Clients
+
+```text
+GET    /clients
+POST   /clients
+GET    /clients/:id
+PATCH  /clients/:id
+DELETE /clients/:id
+
+GET    /clients/search?q=
+GET    /clients/:id/activity
+GET    /clients/:id/bookings
+GET    /clients/:id/installments
+GET    /clients/:id/payments
+POST   /clients/check-duplicate
+```
+
+## Sales and Bookings
+
+```text
+GET    /sales/bookings
+POST   /sales/bookings
+GET    /sales/bookings/:id
+PATCH  /sales/bookings/:id
+DELETE /sales/bookings/:id
+
+POST   /sales/bookings/:id/submit
+POST   /sales/bookings/:id/approve
+POST   /sales/bookings/:id/confirm
+POST   /sales/bookings/:id/cancel
+POST   /sales/bookings/:id/generate-agreement
+```
+
+## Installments and Collections
+
+```text
+GET    /sales/installments
+GET    /sales/installments/:id
+POST   /sales/installments/:id/record-payment
+POST   /sales/installments/:id/send-reminder
+
+GET    /sales/collections
+GET    /sales/collections/overdue
+POST   /sales/collections/:id/process
+POST   /sales/collections/:id/send-notice
+POST   /sales/collections/reconcile
+```
+
+## Projects
+
+```text
+GET    /projects
+POST   /projects
+GET    /projects/:id
+PATCH  /projects/:id
+
+GET    /projects/:id/units
+POST   /projects/:id/units
+PATCH  /projects/units/:id
+
+GET    /projects/:id/milestones
+POST   /projects/:id/milestones
+PATCH  /projects/milestones/:id
+POST   /projects/milestones/:id/complete
+```
+
+## Procurement
+
+```text
+GET    /procurement/vendors
+POST   /procurement/vendors
+GET    /procurement/vendors/:id
+PATCH  /procurement/vendors/:id
+
+GET    /procurement/purchase-requisitions
+POST   /procurement/purchase-requisitions
+GET    /procurement/purchase-requisitions/:id
+
+POST   /procurement/purchase-requisitions/:id/submit
+POST   /procurement/purchase-requisitions/:id/approve
+POST   /procurement/purchase-requisitions/:id/reject
+
+GET    /procurement/purchase-orders
+POST   /procurement/purchase-orders
+GET    /procurement/purchase-orders/:id
+
+POST   /procurement/purchase-orders/:id/approve
+POST   /procurement/purchase-orders/:id/receive
+POST   /procurement/purchase-orders/:id/close
+```
+
+## Construction
+
+```text
+GET    /construction/mrns
+POST   /construction/mrns
+GET    /construction/mrns/:id
+PATCH  /construction/mrns/:id
+
+POST   /construction/mrns/:id/submit
+POST   /construction/mrns/:id/approve
+POST   /construction/mrns/:id/reject
+POST   /construction/mrns/:id/convert-to-po
+
+GET    /construction/work-orders
+POST   /construction/work-orders
+GET    /construction/work-orders/:id
+PATCH  /construction/work-orders/:id
+
+POST   /construction/work-orders/:id/approve
+POST   /construction/work-orders/:id/complete
+
+GET    /construction/ra-bills
+POST   /construction/ra-bills
+GET    /construction/ra-bills/:id
+
+POST   /construction/ra-bills/:id/submit
+POST   /construction/ra-bills/:id/approve
+POST   /construction/ra-bills/:id/reject
+POST   /construction/ra-bills/:id/process-payment
+
+GET    /construction/progress
+POST   /construction/progress
+PATCH  /construction/progress/:id
+
+GET    /construction/equipment
+POST   /construction/equipment
+PATCH  /construction/equipment/:id
+POST   /construction/equipment/:id/fuel-log
+POST   /construction/equipment/:id/maintenance
+```
+
+## Accounting
+
+বর্তমান `AccountingModule` খালি, তাই এটি সবচেয়ে গুরুত্বপূর্ণ implementation area।
+
+```text
+GET    /accounting/chart-of-accounts
+POST   /accounting/chart-of-accounts
+GET    /accounting/chart-of-accounts/:id
+PATCH  /accounting/chart-of-accounts/:id
+DELETE /accounting/chart-of-accounts/:id
+
+GET    /accounting/vouchers
+POST   /accounting/vouchers
+GET    /accounting/vouchers/:id
+PATCH  /accounting/vouchers/:id
+
+POST   /accounting/vouchers/:id/submit
+POST   /accounting/vouchers/:id/approve
+POST   /accounting/vouchers/:id/reject
+POST   /accounting/vouchers/:id/post
+POST   /accounting/vouchers/:id/reverse
+
+GET    /accounting/transactions
+GET    /accounting/general-ledger
+GET    /accounting/general-ledger/:accountId
+GET    /accounting/trial-balance
+GET    /accounting/profit-loss
+GET    /accounting/balance-sheet
+GET    /accounting/cash-flow
+
+GET    /accounting/cash-bank/accounts
+POST   /accounting/cash-bank/accounts
+GET    /accounting/cash-bank/accounts/:id/balance
+POST   /accounting/cash-bank/transfer
+POST   /accounting/bank-reconciliation
+```
+
+## HR and Payroll
+
+```text
+GET    /hr/employees
+POST   /hr/employees
+GET    /hr/employees/:id
+PATCH  /hr/employees/:id
+
+GET    /hr/attendance
+POST   /hr/attendance
+GET    /hr/leaves
+POST   /hr/leaves
+POST   /hr/leaves/:id/approve
+POST   /hr/leaves/:id/reject
+
+GET    /hr/payroll
+POST   /hr/payroll/generate
+POST   /hr/payroll/:id/approve
+POST   /hr/payroll/:id/pay
+```
+
+## Reports
+
+```text
+GET /reports/dashboard
+GET /reports/sales
+GET /reports/collections
+GET /reports/projects
+GET /reports/procurement
+GET /reports/construction
+GET /reports/financial
+GET /reports/export
+```
+
+---
+
+# ৫. গুরুত্বপূর্ণ Automation Workflow
+
+## Booking থেকে Installment
+
+```text
+Booking Confirmed
+  → Contract তৈরি
+  → Installment schedule তৈরি
+  → Client balance update
+  → Accounting receivable তৈরি
+  → Notification পাঠানো
+```
+
+## Installment Payment
+
+```text
+Payment Recorded
+  → Payment validation
+  → Receipt তৈরি
+  → Installment status update
+  → Client outstanding update
+  → Accounting voucher তৈরি
+  → General ledger posting
+  → Receipt PDF generate
+```
+
+## Overdue Collection
+
+প্রতিদিন scheduler চলবে:
+
+```text
+Find overdue installments
+  → Mark as OVERDUE
+  → Calculate late fee
+  → Create collection task
+  → Send reminder
+  → Escalate after configured days
+```
+
+## MRN থেকে Purchase Order
+
+```text
+MRN Approved
+  → Procurement request তৈরি
+  → Vendor selection
+  → Purchase Order তৈরি
+  → Approval workflow
+  → Vendor notification
+```
+
+## Purchase Order থেকে Accounting
+
+```text
+PO Approved
+  → Goods received
+  → GRN তৈরি
+  → Vendor payable তৈরি
+  → Invoice verification
+  → Accounting payable entry
+```
+
+## RA Bill Payment
+
+```text
+RA Bill Submitted
+  → Site engineer verification
+  → Project manager approval
+  → Finance approval
+  → Retention calculation
+  → Tax/VAT calculation
+  → Payable তৈরি
+  → Payment voucher
+  → Ledger posting
+```
+
+## Handover Eligibility
+
+```text
+All installments paid
+  + Required documents complete
+  + Project/unit completed
+  + Management approval
+  → Handover eligible
+```
+
+---
+
+# ৬. Accounting-এর মূল নিয়ম
+
+Accounting কখনো UI থেকে manually balance update করবে না।
+
+প্রতিটি financial event-এর জন্য double-entry posting হবে:
+
+```text
+Debit Account
+Credit Account
+Amount
+Reference Type
+Reference ID
+Posting Date
+```
+
+উদাহরণ: Client payment
+
+```text
+Debit: Cash/Bank
+Credit: Accounts Receivable
+```
+
+উদাহরণ: Vendor payment
+
+```text
+Debit: Accounts Payable
+Credit: Cash/Bank
+```
+
+Voucher post করার সময় database transaction আবশ্যক:
+
+```typescript
+await dataSource.transaction(async (manager) => {
+  const voucher = await createVoucher(manager);
+  await createLedgerEntries(manager, voucher);
+  await updateAccountBalances(manager, voucher);
+  await createAuditLog(manager, voucher);
+});
+```
+
+Balance কখনো frontend calculation থেকে নেওয়া যাবে না। Ledger বা controlled accounting projection থেকে আসতে হবে।
+
+---
+
+# ৭. Database Design Workflow
+
+প্রত্যেক entity তৈরি করার আগে নির্ধারণ করতে হবে:
+
+- Primary key
+- Business reference number
+- Status
+- Organization/company scope
+- Created by
+- Updated by
+- Approved by
+- Created date
+- Updated date
+- Soft delete
+- Audit history
+- Foreign key
+- Unique constraint
+- Required index
+
+উদাহরণ:
+
+```text
+bookings
+├── id
+├── booking_number
+├── client_id
+├── project_id
+├── unit_id
+├── total_amount
+├── paid_amount
+├── due_amount
+├── status
+├── created_by
+├── approved_by
+├── created_at
+└── updated_at
+```
+
+`DB_SYNCHRONIZE=true` production-এ ব্যবহার করা যাবে না। Migration ব্যবহার করতে হবে:
+
+```bash
+npm run migration:generate
+npm run migration:run
+```
+
+---
+
+# ৮. Frontend থেকে Backend Integration Workflow
+
+প্রতিটি frontend page-এর জন্য এই mapping document করতে হবে:
+
+```text
+Frontend Page
+  → Required entities
+  → List API
+  → Detail API
+  → Create API
+  → Update API
+  → Action API
+  → Permission
+  → Loading state
+  → Error state
+  → Empty state
+```
+
+উদাহরণ:
+
+```text
+Frontend: ClientsPage.tsx
+
+GET    /api/v1/clients
+POST   /api/v1/clients
+GET    /api/v1/clients/:id
+PATCH  /api/v1/clients/:id
+DELETE /api/v1/clients/:id
+GET    /api/v1/clients/search?q=
+```
+
+Frontend-এর mock data সরানোর আগে API contract স্থির করতে হবে।
+
+---
+
+# ৯. Testing Workflow
+
+প্রত্যেক feature-এর জন্য minimum test:
+
+### Unit Test
+
+- Service business rule
+- Status transition
+- Duplicate validation
+- Permission rule
+- Amount calculation
+
+### Integration Test
+
+- Service + repository
+- Database transaction
+- Event handler
+- Automation
+
+### E2E Test
+
+```text
+Login
+  → Create client
+  → Create booking
+  → Confirm booking
+  → Generate installment
+  → Record payment
+  → Verify accounting entry
+```
+
+Accounting-এর জন্য অবশ্যই যাচাই:
+
+```text
+Total Debit = Total Credit
+```
+
+---
+
+# ১০. বাস্তব Implementation Sequence
+
+এই repo-তে কাজের final sequence:
+
+```text
+1. Environment and database configuration
+2. Global API response and exception handling
+3. Authentication and RBAC
+4. Users and roles
+5. Audit log and activity history
+6. Projects and project units
+7. Clients
+8. Vendors and procurement masters
+9. Chart of accounts
+10. Bookings
+11. Installments and collections
+12. Procurement workflow
+13. Construction workflow
+14. Accounting vouchers and ledger
+15. HR and payroll
+16. Reports
+17. Notifications, scheduler and automation
+18. Frontend API integration
+19. E2E testing
+20. Production deployment
+```
+
+## বর্তমান Codebase-এর তাৎক্ষণিক কাজ
+
+বর্তমান অবস্থায় প্রথমে এই তিনটি কাজ করা উচিত:
+
+1. `AccountingModule`-এর entity, DTO, controller, service এবং repository তৈরি করা।
+2. `ClientsModule`-এ pagination, duplicate check, audit log, role permission এবং soft delete যোগ করা।
+3. সব module-এর জন্য একই status transition এবং response convention তৈরি করা।
+
+এরপর প্রথম end-to-end vertical slice হিসেবে এই workflow সম্পূর্ণ করা উচিত:
+
+```text
+Client
+  → Project Unit
+  → Booking
+  → Installment
+  → Payment
+  → Receipt
+  → Accounting Ledger
+```
+
+এই vertical slice ঠিকভাবে কাজ করলে একই architecture ব্যবহার করে Procurement, Construction, HR এবং Reports তৈরি করা যাবে।
+
+---
+
+# ১১. ERP Domain Analysis: এই Software কীভাবে কাজ করবে
+
+SLBL-ERP একটি project-centric real-estate developer এবং construction company ERP। এটি শুধু data-entry বা CRUD application নয়। এর মূল business cycle হলো:
+
+```text
+Investor / Capital
+  → Project এবং Unit তৈরি
+  → Client Sales / Booking
+  → Demand এবং Installment
+  → Collection এবং Receivable
+  → Procurement / Contractor / Construction Cost
+  → Payable এবং Cash Disbursement
+  → Payroll / Investor Payout / Tax
+  → Accounting Ledger
+  → Financial এবং Operational Reports
+```
+
+Accounting & Finance হবে পুরো software-এর financial source of truth। অন্য module-গুলো operational document তৈরি করবে; approved financial event হলে Accounting সেই event-এর double-entry তৈরি করবে। কোনো module নিজে balance, paid amount বা ledger balance ইচ্ছামতো update করবে না।
+
+## Module Ownership এবং Accounting Relation
+
+| Module | Operational responsibility | Financial event |
+|---|---|---|
+| Projects | Project, tower, unit, milestone | WIP/cost center reference |
+| Clients & Sales | Client, booking, agreement, demand | Sales receivable, revenue/deposit |
+| Collections | Installment collection, overdue follow-up | Cash/Bank বনাম receivable |
+| Procurement | Vendor, requisition, PO, GRN, vendor bill | Inventory/WIP/expense বনাম payable |
+| Construction | MRN, work order, RA bill, labour, fuel | Project WIP, contractor payable, cash |
+| HR | Employee, attendance, leave, payroll | Salary expense এবং payroll payable |
+| Investors | Equity, contribution, payout | Equity/investor payable এবং cash |
+| Accounting | COA, vouchers, ledger, reconciliation | Final financial truth |
+| Reports | Financial/operational read model | Ledger এবং approved operational data |
+| Settings | Company, fiscal year, tax, approval rules | Global accounting configuration |
+
+---
+
+# ১২. Accounting Control Model
+
+## Accounting-এর পাঁচটি স্তর
+
+```text
+1. Master Data
+   Chart of Accounts, tax, fiscal year, cost center, bank/cash accounts
+
+2. Source Documents
+   Booking, invoice, bill, GRN, RA bill, payroll, investor payout
+
+3. Approval
+   Department approval এবং Finance approval
+
+4. Posting
+   Approved document থেকে immutable journal/ledger entry
+
+5. Control এবং Reporting
+   Reconciliation, period close, trial balance, P&L, balance sheet, cash flow
+```
+
+## Document এবং Ledger-এর সম্পর্ক
+
+প্রতিটি source document-এ এই field থাকতে হবে:
+
+```text
+sourceType
+sourceId
+documentNo
+documentDate
+companyId
+projectId / costCenterId
+currency
+taxAmount
+netAmount
+grossAmount
+status
+createdBy
+approvedBy
+postedAt
+```
+
+Ledger entry-তে source document-এর reference বাধ্যতামূলক হবে। Post হওয়ার পরে voucher বা ledger line edit করা যাবে না; correction হলে reversal এবং নতুন correcting voucher হবে।
+
+## Double-entry Rule
+
+প্রতিটি journal-এ এক বা একাধিক debit line এবং credit line থাকবে।
+
+```text
+SUM(debit lines) = SUM(credit lines)
+```
+
+প্রধান posting rules:
+
+| Business event | Debit | Credit |
+|---|---|---|
+| Client invoice/demand | Accounts Receivable | Booking/Sales Revenue বা Customer Advance |
+| Client collection | Cash/Bank | Accounts Receivable |
+| Vendor bill | Project WIP/Expense/Inventory | Accounts Payable |
+| Vendor payment | Accounts Payable | Cash/Bank |
+| Payroll approval | Salary Expense | Salary Payable |
+| Salary payment | Salary Payable | Cash/Bank |
+| Investor contribution | Cash/Bank | Investor Equity/Payable |
+| Investor payout | Investor Payable/Equity | Cash/Bank |
+| Bank charge | Bank Charge Expense | Bank |
+| Fund transfer | Destination Cash/Bank | Source Cash/Bank |
+| Depreciation | Depreciation Expense | Accumulated Depreciation |
+
+Revenue recognition, customer advance, WIP capitalization, retention, VAT এবং withholding tax company policy অনুযায়ী configurable হবে; UI label দেখে সরাসরি revenue post করা যাবে না।
+
+---
+
+# ১৩. Accounting Workflow: Step by Step
+
+## Step 1: Company এবং Fiscal Configuration
+
+`Settings` থেকে Finance Manager configure করবে:
+
+```text
+Company / branch
+Fiscal year এবং accounting period
+Base currency এবং exchange rate
+Voucher numbering series
+Tax/VAT/withholding rules
+Approval thresholds
+Default accounts
+Project এবং cost center
+```
+
+Period closed হলে সেই period-এর document post, edit বা delete করা যাবে না।
+
+## Step 2: Chart of Accounts এবং Mapping
+
+`Accounting → Chart of Accounts` থেকে:
+
+```text
+Account group
+  → Header account
+    → Posting account
+```
+
+প্রতিটি posting account-এর সঙ্গে mapping থাকবে:
+
+```text
+customer receivable account
+vendor payable account
+sales/deposit account
+project WIP account
+salary expense account
+tax/VAT account
+cash/bank account
+```
+
+Header account-এ direct posting নিষিদ্ধ হবে। Used account delete করা যাবে না; inactive করা যাবে।
+
+## Step 3: Source Document তৈরি
+
+Sales, Procurement, Construction, HR বা Investor module source document তৈরি করবে। তখন status হবে `DRAFT`।
+
+Draft অবস্থায়:
+
+- User line item edit করতে পারবে
+- Attachment যোগ করতে পারবে
+- Totals recalculate হবে
+- Posting হবে না
+- Ledger balance পরিবর্তন হবে না
+
+## Step 4: Submit এবং Approval
+
+Submit করলে document immutable review snapshot হবে:
+
+```text
+DRAFT → SUBMITTED → DEPARTMENT_APPROVED → FINANCE_APPROVED
+```
+
+Rejected হলে reason বাধ্যতামূলক:
+
+```text
+SUBMITTED → REJECTED → DRAFT
+```
+
+Approval threshold অনুযায়ী এক বা একাধিক approver লাগবে। Creator নিজে নিজের document approve করতে পারবে না।
+
+## Step 5: Posting
+
+Finance approval-এর পরে `Post` action চলবে। Backend transaction-এর মধ্যে:
+
+```text
+1. Period open কিনা যাচাই
+2. Document duplicate posted কিনা যাচাই
+3. Account mapping যাচাই
+4. Debit/Credit equality যাচাই
+5. Journal header তৈরি
+6. Journal lines তৈরি
+7. Sub-ledger balance update
+8. Audit log তৈরি
+9. Source document status POSTED করা
+10. Domain event publish করা
+```
+
+এর সবগুলো একই database transaction-এ হবে। যেকোনো ধাপে failure হলে সব rollback হবে।
+
+## Step 6: Reversal এবং Correction
+
+Posted document edit বা delete করা যাবে না। ভুল হলে:
+
+```text
+POSTED → REVERSED
+  → Reversal journal
+  → Corrected source document
+  → New journal
+```
+
+Reversal action-এ reason এবং authorizer বাধ্যতামূলক হবে।
+
+## Step 7: Period Close এবং Reports
+
+Month-end workflow:
+
+```text
+All approvals complete
+  → Bank reconciliation complete
+  → Receivable/payable aging review
+  → Accrual এবং depreciation
+  → Trial balance check
+  → Finance manager review
+  → Period close
+  → Financial reports freeze
+```
+
+---
+
+# ১৪. কোন Page বা Modal থেকে Accounting Manage হবে
+
+## Accounting Pages
+
+| UI page | Backend responsibility | Accounting effect |
+|---|---|---|
+| Chart of Accounts | Account hierarchy এবং mapping | No direct posting |
+| Vouchers | Manual journal draft/review/post | Journal entry |
+| General Ledger | Posted journal read-only view | Ledger inquiry |
+| Cash & Bank | Account master, transfer, statement | Cash/bank journal |
+| Receivables | Invoice, collection, aging, reminder | AR এবং receipt posting |
+| Payables | Bill, approval, payment, aging | AP এবং payment posting |
+| Bank Reconciliation | Import, match, exception, close | Reconciliation status |
+| Invoices & Receipts | Demand/invoice এবং official receipt | AR source document |
+| Trial Balance | Debit/credit control | Read-only report |
+| P&L / Balance Sheet / Cash Flow | Financial statements | Read-only report |
+
+## Other Module Entry Points
+
+```text
+Clients/Bookings
+  → Confirm booking
+  → Create demand/installment schedule
+  → Create AR source document
+
+Collections
+  → Record payment
+  → Create receipt
+  → Post Cash/Bank Dr, AR Cr
+
+Procurement/Vendor Bills
+  → Verify bill with PO + GRN
+  → Create AP source document
+  → Post WIP/Expense Dr, AP Cr
+
+Construction/RA Bills
+  → Site verification
+  → Measurement এবং retention calculation
+  → Finance approval
+  → Post project WIP Dr, contractor AP Cr
+
+HR/Payroll
+  → Approve payroll run
+  → Post salary expense এবং salary payable
+  → Payment হলে payable clear
+
+Investors/Payout Schedule
+  → Approve payout
+  → Post investor payable/equity movement
+  → Payment হলে cash clear
+```
+
+Rule: অন্য module-এর modal কখনো সরাসরি ledger row লিখবে না। Modal source document বা payment command submit করবে; Accounting posting service event অনুযায়ী journal তৈরি করবে।
+
+---
+
+# ১৫. বর্তমান Frontend UI Gap Register
+
+বর্তমান UI structure শক্তিশালী screen coverage দেখাচ্ছে, কিন্তু production automation-এর আগে নিচের gap পূরণ করতে হবে:
+
+## Critical Gaps
+
+1. `NewVoucherModal`-এ একটিমাত্র account head এবং amount আছে। Double-entry-এর জন্য dynamic debit/credit line items, line total, balancing validation এবং account selection দরকার।
+2. `CollectPaymentModal` এবং `VendorPaymentModal` mock client/vendor data ব্যবহার করছে। এগুলো live searchable API এবং outstanding validation-এ যেতে হবে।
+3. Voucher, payment এবং bill modal-এ status সাধারণত `APPROVED` ধরে নেওয়া হচ্ছে। Draft, submit, review, approve এবং post আলাদা action হতে হবে।
+4. Cash & Bank-এর fund transfer বর্তমানে TODO; Add Account modal-ও incomplete।
+5. Bank Reconciliation-এর auto-match, manual-match, unmatch এবং create-voucher action এখনও TODO/mock।
+6. Invoice page-এ `Issue Money Receipt` action-এর পূর্ণ modal/API workflow দরকার।
+7. KPI এবং aging values-এর কিছু অংশ hardcoded; সব summary backend query/report endpoint থেকে আসতে হবে।
+8. Payment amount outstanding-এর চেয়ে বেশি, closed period, duplicate reference, duplicate bill এবং duplicate cheque প্রতিরোধের UI/backend validation দরকার।
+9. Attachment upload দেখা যাচ্ছে, কিন্তু file upload endpoint, virus/type/size validation, document storage এবং audit reference নির্দিষ্ট নয়।
+10. Approval history, rejection reason, audit trail, activity timeline এবং posted journal preview UI দরকার।
+
+## Important UX/Control Gaps
+
+1. প্রতিটি action-এর loading, success, inline validation এবং server error state থাকতে হবে; `alert()`-এর পরিবর্তে consistent notification ব্যবহার করতে হবে।
+2. Icon-only button-এ accessible label, form input-এ `name`/`autocomplete`, visible focus state এবং keyboard-accessible searchable dropdown থাকতে হবে।
+3. Modal close বা page change-এর আগে unsaved form warning দরকার।
+4. Filter, tab, date range এবং pagination URL query-তে sync করতে হবে যাতে report/page deep-link করা যায়।
+5. Date এবং currency format frontend-এ hardcode না করে locale formatter ব্যবহার করতে হবে।
+6. Destructive action যেমন cancel, reverse, delete এবং unmatch confirmation ও reason চাইবে।
+7. Financial amount column-এ tabular numbers, currency এবং debit/credit sign convention consistent করতে হবে।
+8. Mobile/site workflow-এর জন্য construction forms-এ offline/poor-network retry, attachment progress এবং saved draft দরকার।
+
+## UI Gap ঠিক করার Priority
+
+```text
+P0: Double-entry voucher, live entity lookup, approval/post/reversal, period lock
+P0: Payment/bill validation, live balances, transaction-safe API
+P1: Bank reconciliation actions, invoice/receipt workflow, attachments
+P1: Audit/history, rejection reason, permissions, consistent error/loading states
+P2: Export, advanced filters, mobile/offline improvements, dashboard polish
+```
+
+---
+
+# ১৬. Exact Implementation Workflow: একবারে একটি Vertical Slice
+
+প্রতিটি phase-এ একই delivery loop ব্যবহার করতে হবে:
+
+```text
+1. UI action inventory
+2. Domain entity এবং status definition
+3. Database migration এবং constraints
+4. DTO এবং validation
+5. Repository/query
+6. Service use case
+7. Permission/policy
+8. Transaction এবং accounting event
+9. Controller route এবং Swagger
+10. Unit/integration/E2E test
+11. Frontend API integration
+12. Mock data removal
+13. UI state এবং accessibility verification
+```
+
+## Vertical Slice 1: Booking থেকে Collection পর্যন্ত
+
+```text
+Project
+  → Unit
+  → Client
+  → Booking draft
+  → Booking approval/confirmation
+  → Invoice/demand
+  → Installment schedule
+  → Payment collection
+  → Money receipt
+  → AR journal
+  → Cash/Bank balance
+  → Client ledger এবং report
+```
+
+এটি সম্পূর্ণ না হওয়া পর্যন্ত Procurement বা Payroll-এর deep automation শুরু করা উচিত নয়, কারণ এই slice-এ core ERP pattern, ID/reference, approval, posting, receipt, audit এবং report সব পরীক্ষা হয়।
+
+## Vertical Slice 2: Procurement থেকে Vendor Payment
+
+```text
+MRN/Purchase Requisition
+  → PO
+  → Approval
+  → GRN
+  → Vendor Bill
+  → Three-way match (PO + GRN + Bill)
+  → AP journal
+  → Vendor payment
+  → Bank reconciliation
+```
+
+## Vertical Slice 3: Construction RA Bill থেকে Project Cost
+
+```text
+Work Order
+  → Progress measurement
+  → RA Bill
+  → Site verification
+  → Project approval
+  → Retention/tax calculation
+  → Finance approval
+  → Project WIP/AP journal
+  → Contractor payment
+```
+
+## Vertical Slice 4: Payroll এবং Investor Payout
+
+```text
+Attendance/Payroll run → Approval → Salary payable → Payment → Ledger
+Investor contribution → Equity register → Payout approval → Payment → Ledger
+```
+
+## Vertical Slice 5: Month-end Control
+
+```text
+AR aging
+  + AP aging
+  + Bank reconciliation
+  + Payroll payable
+  + Project WIP
+  + Tax/VAT
+  → Trial balance
+  → P&L / Balance Sheet / Cash Flow
+  → Period close
+```
+
+---
+
+# ১৭. Backend Function Boundary
+
+Business-critical function-এর নাম এবং দায়িত্ব আগে স্থির করতে হবে:
+
+```text
+AccountingService.createDraftVoucher()
+AccountingService.submitVoucher()
+AccountingService.approveVoucher()
+AccountingService.postVoucher()
+AccountingService.reverseVoucher()
+AccountingService.getLedger()
+AccountingService.getTrialBalance()
+
+PostingService.postClientInvoice()
+PostingService.postClientCollection()
+PostingService.postVendorBill()
+PostingService.postVendorPayment()
+PostingService.postPayroll()
+PostingService.postInvestorPayout()
+
+ReceivableService.createInstallmentSchedule()
+ReceivableService.recordCollection()
+ReceivableService.calculateAging()
+
+PayableService.matchPurchaseBill()
+PayableService.createPaymentRequest()
+PayableService.calculateRetentionAndTax()
+
+ReconciliationService.importStatement()
+ReconciliationService.autoMatch()
+ReconciliationService.manualMatch()
+ReconciliationService.closeReconciliation()
+
+PeriodService.openPeriod()
+PeriodService.closePeriod()
+PeriodService.assertPeriodOpen()
+AuditService.record()
+```
+
+Controller থেকে `postClientCollection()` বা `postVendorPayment()` direct call করা যাবে, কিন্তু posting logic controller-এ থাকবে না। সব financial posting একটি shared `PostingService` দিয়ে হবে।
+
+---
+
+# ১৮. Final Delivery Gates
+
+কোনো module complete বলা যাবে না যতক্ষণ না:
+
+```text
+[ ] Frontend page-এর প্রতিটি action-এর API আছে
+[ ] Mock data এবং TODO action সরানো হয়েছে
+[ ] Entity, DTO, migration এবং indexes আছে
+[ ] Permission এবং approval path আছে
+[ ] Status transition invalid হলে error হয়
+[ ] Financial event transaction-safe
+[ ] Debit = Credit test pass
+[ ] Audit trail এবং source reference আছে
+[ ] Attachment/document flow কাজ করে
+[ ] Pagination/filter/search server-side কাজ করে
+[ ] Loading/error/empty/success state আছে
+[ ] Swagger এবং API contract update আছে
+[ ] Unit, integration এবং E2E test pass
+[ ] Period close এবং reversal rule tested
+```
+
+এই build-order-এর বাস্তব প্রথম implementation target হবে:
+
+```text
+Accounting foundation
+  → Project/Unit/Client master API
+  → Booking এবং installment API
+  → Collection + money receipt API
+  → Shared posting service
+  → AR ledger এবং cash/bank update
+  → End-to-end test
+```

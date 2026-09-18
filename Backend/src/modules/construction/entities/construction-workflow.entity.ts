@@ -1,0 +1,10 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+
+@Entity('material_requisitions')
+export class MaterialRequisition { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) mrnNo: string; @Column() projectId: string; @Column() requestedBy: string; @Column() material: string; @Column() quantity: string; @Column() unit: string; @Column({ type: 'date' }) requiredDate: string; @Column({ default: 'PENDING' }) status: string; @CreateDateColumn() createdAt: Date; @UpdateDateColumn() updatedAt: Date; }
+
+@Entity('construction_work_orders')
+export class ConstructionWorkOrder { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) workOrderNo: string; @Column() projectId: string; @Column() contractorId: string; @Column({ type: 'text' }) description: string; @Column({ type: 'decimal', precision: 15, scale: 2 }) amount: number; @Column({ default: 'PENDING' }) status: string; @Column({ type: 'date' }) startDate: string; @Column({ type: 'date' }) endDate: string; @CreateDateColumn() createdAt: Date; @UpdateDateColumn() updatedAt: Date; }
+
+@Entity('ra_bills')
+export class RABill { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) raNo: string; @Column() workOrderId: string; @Column() projectId: string; @Column() contractorId: string; @Column({ type: 'decimal', precision: 15, scale: 2 }) amount: number; @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 }) retentionAmount: number; @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 }) paidAmount: number; @Column({ default: 'DRAFT' }) status: string; @Column({ type: 'date' }) submittedDate: string; @Column({ type: 'text', nullable: true }) description: string; @CreateDateColumn() createdAt: Date; @UpdateDateColumn() updatedAt: Date; }

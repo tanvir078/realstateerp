@@ -1,0 +1,2 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+@Entity('payable_ledger_entries') export class PayableLedgerEntry { @PrimaryGeneratedColumn('uuid') id: string; @Column() referenceType: string; @Column() referenceId: string; @Column({ name: 'project_id', nullable: true }) projectId: string | null; @Column() debitAccountCode: string; @Column() creditAccountCode: string; @Column({ type: 'decimal', precision: 15, scale: 2 }) amount: number; @Column({ type: 'date' }) postingDate: string; @CreateDateColumn() createdAt: Date; }
